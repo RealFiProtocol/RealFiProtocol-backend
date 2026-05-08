@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  AGENT
+  ADMIN
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  PENDING
+  SOLD
+}
+
+enum TransactionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  password            String
+  firstName           String
+  lastName            String
+  role                UserRole   @default(USER)
+  isBlocked           Boolean    @default(false)
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
+  passwordHistory     String[]   @default([])
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  properties   Property[]
+  transactions Transaction[]
+  documents    Document[]
+}
+
+model Property {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  address     String
+  city        String
+  state       String
+  zipCode     String
+  price       Decimal        @db.Decimal(15, 2)
+  bedrooms    Int?
+  bathrooms   Int?
+  sqft        Int?
+  status      PropertyStatus @default(AVAILABLE)
+  ownerId     String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  owner        User          @relation(fields: [ownerId], references: [id])
+  transactions Transaction[]
+  documents    Document[]
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+  propertyId      String
+  buyerId         String
+  amount          Decimal           @db.Decimal(15, 2)
+  status          TransactionStatus @default(PENDING)
+  blockchainTxHash String?
+  closingDate     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  property      Property      @relation(fields: [propertyId], references: [id])
+  buyer         User          @relation(fields: [buyerId], references: [id])
+  taxStrategies TaxStrategy[]
+  documents     Document[]
+}
+
+model Document {
+  id            String   @id @default(uuid())
+  name          String
+  url           String
+  mimeType      String?
+  propertyId    String?
+  transactionId String?
+  uploadedById  String
+  createdAt     DateTime @default(now())
+
+  property    Property?    @relation(fields: [propertyId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  uploadedBy  User         @relation(fields: [uploadedById], references: [id])
+}
+
+model TaxStrategy {
+  id            String   @id @default(uuid())
+  transactionId String
+  title         String
+  description   String
+  disclaimer    String   @default("This is informational only and not legal or tax advice.")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+}
